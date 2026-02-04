@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib
-import os
 import struct
 from pathlib import Path
 from typing import Iterable, Sequence, Tuple
@@ -44,10 +43,14 @@ def lpt_bin_bytes_header_only_record_count_0() -> bytes:
 def make_lpt_bin_bytes() -> callable:
     """Factory to build custom LPT.bin bytes for tests."""
 
-    def _make(*, record_count: int, records: Sequence[Tuple] = (), include_header: bool = True) -> bytes:
+    def _make(
+        *, record_count: int, records: Sequence[Tuple] = (), include_header: bool = True
+    ) -> bytes:
         payload = b""
         if include_header:
-            payload += _pack_header(magic=0xABCD1234, version=1, record_count=record_count, reserved=0)
+            payload += _pack_header(
+                magic=0xABCD1234, version=1, record_count=record_count, reserved=0
+            )
         for r in records:
             payload += _pack_record(*r)
         return payload

@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import pytest
 from fastapi.testclient import TestClient
 
 
@@ -23,7 +22,9 @@ def test_health_check(api_client: TestClient) -> None:
     assert "running" in body["message"].lower()
 
 
-def test_convert_by_path_success(tmp_path: Path, api_client: TestClient, lpt_bin_bytes_valid_two_records: bytes) -> None:
+def test_convert_by_path_success(
+    tmp_path: Path, api_client: TestClient, lpt_bin_bytes_valid_two_records: bytes
+) -> None:
     inp = tmp_path / "in.bin"
     out = tmp_path / "out.csv"
     inp.write_bytes(lpt_bin_bytes_valid_two_records)
@@ -46,16 +47,25 @@ def test_convert_by_path_success(tmp_path: Path, api_client: TestClient, lpt_bin
 
 
 def test_convert_by_path_validation_error_empty_path(api_client: TestClient) -> None:
-    resp = api_client.post("/convert", json={"input_path": "   ", "output_path": "x.csv", "skip_header": False})
+    resp = api_client.post(
+        "/convert",
+        json={"input_path": "   ", "output_path": "x.csv", "skip_header": False},
+    )
     # Pydantic/fastapi validation error (422) because input_path cannot be empty (validator)
     assert resp.status_code == 422
 
 
-def test_convert_by_path_outside_allowed_root_is_400(tmp_path: Path, api_client: TestClient) -> None:
+def test_convert_by_path_outside_allowed_root_is_400(
+    tmp_path: Path, api_client: TestClient
+) -> None:
     outside = Path("/tmp/outside.bin")
     resp = api_client.post(
         "/convert",
-        json={"input_path": str(outside), "output_path": str(tmp_path / "o.csv"), "skip_header": False},
+        json={
+            "input_path": str(outside),
+            "output_path": str(tmp_path / "o.csv"),
+            "skip_header": False,
+        },
     )
     assert resp.status_code == 400
     detail = resp.json()["detail"]
@@ -63,7 +73,9 @@ def test_convert_by_path_outside_allowed_root_is_400(tmp_path: Path, api_client:
     assert "outside allowed root" in detail["message"]
 
 
-def test_convert_by_path_not_found_is_400_due_to_validation(api_client: TestClient, tmp_path: Path) -> None:
+def test_convert_by_path_not_found_is_400_due_to_validation(
+    api_client: TestClient, tmp_path: Path
+) -> None:
     # resolve_and_validate_path(must_exist=True) raises ValueError => mapped to 400
     resp = api_client.post(
         "/convert",
@@ -89,7 +101,13 @@ def test_convert_upload_success_and_temp_cleanup(
 
     resp = api_client.post(
         "/convert/upload",
-        files={"file": ("input.bin", lpt_bin_bytes_valid_two_records, "application/octet-stream")},
+        files={
+            "file": (
+                "input.bin",
+                lpt_bin_bytes_valid_two_records,
+                "application/octet-stream",
+            )
+        },
         params={"skip_header": "false"},
     )
 
@@ -106,7 +124,9 @@ def test_convert_upload_success_and_temp_cleanup(
 
     # BackgroundTask cleanup should have run after response was produced by TestClient.
     after = temp_dir_file_snapshot()
-    assert after == before, f"Expected no leftover temp files, but found: {sorted(after - before)}"
+    assert (
+        after == before
+    ), f"Expected no leftover temp files, but found: {sorted(after - before)}"
 
 
 def test_convert_upload_missing_file_field_returns_422(api_client: TestClient) -> None:
@@ -150,4 +170,6 @@ def test_convert_upload_malformed_bin_returns_400_and_cleans_temps(
     assert len(rows) == 1
 
     after = temp_dir_file_snapshot()
-    assert after == before, f"Expected no leftover temp files, but found: {sorted(after - before)}"
+    assert (
+        after == before
+    ), f"Expected no leftover temp files, but found: {sorted(after - before)}"

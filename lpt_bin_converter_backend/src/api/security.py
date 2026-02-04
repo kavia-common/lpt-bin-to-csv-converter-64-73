@@ -13,7 +13,9 @@ from typing import Optional
 
 
 # PUBLIC_INTERFACE
-def resolve_and_validate_path(user_path: str, *, must_exist: bool, allowed_root: Optional[Path]) -> Path:
+def resolve_and_validate_path(
+    user_path: str, *, must_exist: bool, allowed_root: Optional[Path]
+) -> Path:
     """Resolve and validate a user-provided filesystem path.
 
     This prevents obvious path traversal issues by resolving to an absolute path and,
@@ -46,7 +48,9 @@ def resolve_and_validate_path(user_path: str, *, must_exist: bool, allowed_root:
         try:
             is_within = resolved.is_relative_to(root)
         except AttributeError:
-            is_within = str(resolved).startswith(str(root) + "/") or str(resolved) == str(root)
+            is_within = str(resolved).startswith(str(root) + "/") or str(
+                resolved
+            ) == str(root)
 
         if not is_within:
             raise ValueError(f"Path is outside allowed root: {user_path}")

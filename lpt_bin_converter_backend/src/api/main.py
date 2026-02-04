@@ -16,15 +16,19 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Optional, List
+from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, status, Query
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 from starlette.background import BackgroundTask
 
-from .config import load_settings, configure_logging
-from .security import resolve_and_validate_path, sanitize_download_filename
+from ..converter.lpt_converter import (
+    LPTBinParserError,
+    ParserConfig,
+    convert_lpt_bin_to_csv,
+)
+from .config import configure_logging, load_settings
 from .models import (
     ConversionRequest,
     ConversionResponse,
@@ -32,11 +36,7 @@ from .models import (
     HealthResponse,
     ParserConfigRequest,
 )
-from ..converter.lpt_converter import (
-    convert_lpt_bin_to_csv,
-    ParserConfig,
-    LPTBinParserError,
-)
+from .security import resolve_and_validate_path, sanitize_download_filename
 
 settings = load_settings()
 configure_logging(settings.log_level)
@@ -96,7 +96,9 @@ def _cleanup_files(paths: List[str]) -> None:
             logger.warning("Failed to clean up temp file %s: %s", p, e)
 
 
-async def _stream_upload_to_disk(upload: UploadFile, dest_path: str, max_bytes: int) -> int:
+async def _stream_upload_to_disk(
+    upload: UploadFile, dest_path: str, max_bytes: int
+) -> int:
     """Stream an UploadFile to disk with a strict max size.
 
     Args:
@@ -159,7 +161,9 @@ def health_check():
     Returns:
         HealthResponse: Service status information
     """
-    return HealthResponse(status="healthy", message="LPT.bin to CSV Converter API is running")
+    return HealthResponse(
+        status="healthy", message="LPT.bin to CSV Converter API is running"
+    )
 
 
 # PUBLIC_INTERFACE
@@ -177,8 +181,14 @@ def docs_usage() -> str:
     Returns:
         PlainTextResponse: Notes on upload limits, path restrictions, and endpoint guidance.
     """
-    input_root = str(settings.allowed_input_root) if settings.allowed_input_root else "(not set)"
-    output_root = str(settings.allowed_output_root) if settings.allowed_output_root else "(not set)"
+    input_root = (
+        str(settings.allowed_input_root) if settings.allowed_input_root else "(not set)"
+    )
+    output_root = (
+        str(settings.allowed_output_root)
+        if settings.allowed_output_root
+        else "(not set)"
+    )
     return (
         "LPT.bin → CSV Converter API usage notes\n"
         "\n"
@@ -206,7 +216,10 @@ def docs_usage() -> str:
     response_model=ConversionResponse,
     responses={
         200: {"description": "Conversion successful", "model": ConversionResponse},
-        400: {"description": "Invalid request or parsing error", "model": ErrorResponse},
+        400: {
+            "description": "Invalid request or parsing error",
+            "model": ErrorResponse,
+        },
         404: {"description": "Input file not found", "model": ErrorResponse},
         500: {"description": "Internal server error", "model": ErrorResponse},
     },
@@ -236,10 +249,14 @@ def convert_file(request: ConversionRequest):
     """
     try:
         input_path = resolve_and_validate_path(
-            request.input_path, must_exist=True, allowed_root=settings.allowed_input_root
+            request.input_path,
+            must_exist=True,
+            allowed_root=settings.allowed_input_root,
         )
         output_path = resolve_and_validate_path(
-            request.output_path, must_exist=False, allowed_root=settings.allowed_output_root
+            request.output_path,
+            must_exist=False,
+            allowed_root=settings.allowed_output_root,
         )
 
         logger.info("Converting %s to %s", input_path, output_path)
@@ -290,7 +307,10 @@ def convert_file(request: ConversionRequest):
     "/convert/upload",
     response_class=FileResponse,
     responses={
-        200: {"description": "CSV file generated successfully", "content": {"text/csv": {}}},
+        200: {
+            "description": "CSV file generated successfully",
+            "content": {"text/csv": {}},
+        },
         400: {"description": "Invalid file or parsing error", "model": ErrorResponse},
         413: {"description": "Uploaded file too large", "model": ErrorResponse},
         500: {"description": "Internal server error", "model": ErrorResponse},
@@ -301,7 +321,9 @@ def convert_file(request: ConversionRequest):
 )
 async def convert_upload(
     file: UploadFile = File(..., description="LPT.bin file to convert"),
-    skip_header: bool = Query(default=False, description="Whether to skip header parsing"),
+    skip_header: bool = Query(
+        default=False, description="Whether to skip header parsing"
+    ),
 ):
     """
     Upload an LPT.bin file and receive the converted CSV file.
@@ -332,14 +354,22 @@ async def convert_upload(
         if not file.filename:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"success": False, "error": "ValidationError", "message": "No file provided"},
+                detail={
+                    "success": False,
+                    "error": "ValidationError",
+                    "message": "No file provided",
+                },
             )
 
         logger.info("Processing uploaded file: %s", file.filename)
 
         # Create temp file paths in our configured temp directory.
-        temp_input = str((settings.temp_dir / f"upload_{os.getpid()}_{id(file)}.bin").resolve())
-        temp_output = str((settings.temp_dir / f"output_{os.getpid()}_{id(file)}.csv").resolve())
+        temp_input = str(
+            (settings.temp_dir / f"upload_{os.getpid()}_{id(file)}.bin").resolve()
+        )
+        temp_output = str(
+            (settings.temp_dir / f"output_{os.getpid()}_{id(file)}.csv").resolve()
+        )
 
         # Stream upload to temp input with size cap.
         await _stream_upload_to_disk(file, temp_input, settings.max_upload_bytes)
@@ -394,7 +424,10 @@ async def convert_upload(
     response_model=ConversionResponse,
     responses={
         200: {"description": "Conversion successful", "model": ConversionResponse},
-        400: {"description": "Invalid request or parsing error", "model": ErrorResponse},
+        400: {
+            "description": "Invalid request or parsing error",
+            "model": ErrorResponse,
+        },
         404: {"description": "Input file not found", "model": ErrorResponse},
         500: {"description": "Internal server error", "model": ErrorResponse},
     },
@@ -402,7 +435,9 @@ async def convert_upload(
     summary="Convert with custom parser configuration",
     description="Convert LPT.bin to CSV with custom struct format configuration",
 )
-def convert_advanced(request: ConversionRequest, parser_config: Optional[ParserConfigRequest] = None):
+def convert_advanced(
+    request: ConversionRequest, parser_config: Optional[ParserConfigRequest] = None
+):
     """
     Convert LPT.bin file with advanced parser configuration.
 
@@ -421,10 +456,14 @@ def convert_advanced(request: ConversionRequest, parser_config: Optional[ParserC
     """
     try:
         input_path = resolve_and_validate_path(
-            request.input_path, must_exist=True, allowed_root=settings.allowed_input_root
+            request.input_path,
+            must_exist=True,
+            allowed_root=settings.allowed_input_root,
         )
         output_path = resolve_and_validate_path(
-            request.output_path, must_exist=False, allowed_root=settings.allowed_output_root
+            request.output_path,
+            must_exist=False,
+            allowed_root=settings.allowed_output_root,
         )
 
         config_kwargs = {"skip_header": request.skip_header}
@@ -495,7 +534,12 @@ def get_format_info():
     Returns:
         dict: Default parser configuration details
     """
-    from ..converter.lpt_converter import HEADER_FORMAT, HEADER_FIELDS, RECORD_FORMAT, RECORD_FIELDS
+    from ..converter.lpt_converter import (
+        HEADER_FIELDS,
+        HEADER_FORMAT,
+        RECORD_FIELDS,
+        RECORD_FORMAT,
+    )
 
     return {
         "header": {

@@ -71,13 +71,21 @@ def load_settings() -> Settings:
     allowed_input_root_raw = _get_env_str("LPT_API_ALLOWED_INPUT_ROOT", "").strip()
     allowed_output_root_raw = _get_env_str("LPT_API_ALLOWED_OUTPUT_ROOT", "").strip()
 
-    allowed_input_root = Path(allowed_input_root_raw).resolve() if allowed_input_root_raw else None
-    allowed_output_root = Path(allowed_output_root_raw).resolve() if allowed_output_root_raw else None
+    allowed_input_root = (
+        Path(allowed_input_root_raw).resolve() if allowed_input_root_raw else None
+    )
+    allowed_output_root = (
+        Path(allowed_output_root_raw).resolve() if allowed_output_root_raw else None
+    )
 
     max_upload_bytes = _get_env_int("LPT_API_MAX_UPLOAD_BYTES", 50 * 1024 * 1024)
 
     temp_dir_raw = _get_env_str("LPT_API_TEMP_DIR", "").strip()
-    temp_dir = Path(temp_dir_raw).resolve() if temp_dir_raw else Path(tempfile.gettempdir()).resolve()
+    temp_dir = (
+        Path(temp_dir_raw).resolve()
+        if temp_dir_raw
+        else Path(tempfile.gettempdir()).resolve()
+    )
     temp_dir.mkdir(parents=True, exist_ok=True)
 
     cors_origins = _parse_cors_origins(_get_env_str("LPT_API_CORS_ORIGINS", "*"))
